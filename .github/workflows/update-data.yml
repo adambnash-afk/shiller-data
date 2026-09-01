@@ -13,6 +13,9 @@ on:
 
 permissions:
   contents: write
+  # The keepalive step calls the Actions API; without this it 403s and turns an
+  # otherwise-successful data build red.
+  actions: write
 
 concurrency:
   group: update-data
@@ -63,7 +66,11 @@ jobs:
       # GitHub disables scheduled workflows after 60 days of repository
       # inactivity, and commits pushed by GITHUB_TOKEN do not reliably reset
       # that clock. This is the second half of how the previous feed went quiet.
+      # Nice-to-have, not the point of the job. If the action fails or changes its
+      # interface, that must never mask a successful data build — a red run here
+      # would train us to ignore exactly the alarm this pipeline exists to raise.
       - name: Keep the schedule alive
+        continue-on-error: true
         uses: gautamkrishnar/keepalive-workflow@v2
         with:
           use_api: true
