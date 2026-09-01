@@ -1,0 +1,69 @@
+name: Update Shiller data
+
+on:
+  schedule:
+    # Weekly, Tuesday 13:00 UTC. Shiller refreshes irregularly; weekly is ample
+    # for a monthly series and keeps us well inside GitHub's 60-day cron window.
+    - cron: "0 13 * * 2"
+  workflow_dispatch:
+  push:
+    paths:
+      - "scripts/**"
+      - ".github/workflows/update-data.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install "xlrd==2.0.*"
+
+      # build_data.py exits non-zero on ANY anomaly: link not found on
+      # shillerdata.com, a column it cannot map, too few records, CAPE outside a
+      # sane range, or a feed that would regress. A failure here emails the repo
+      # owner, which is the whole point -- the feed this replaces died silently.
+      - name: Build JSON feed
+        run: python3 scripts/build_data.py --out data
+
+      - name: Show result
+        run: |
+          python3 - <<'PY'
+          import json
+          d = json.load(open("data/stock_market_data.json"))
+          m = d["metadata"]
+          print("records:", m["total_records"], "latest:", m["latest_date"])
+          print("latest CAPE:", d["data"][-1]["cape"])
+          PY
+
+      - name: Commit if changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain data)" ]; then
+            git add data
+            git commit -m "Update Shiller data ($(date -u +%Y-%m-%d))"
+            git push
+          else
+            echo "No change in data; nothing to commit."
+          fi
+
+      # GitHub disables scheduled workflows after 60 days of repository
+      # inactivity, and commits pushed by GITHUB_TOKEN do not reliably reset
+      # that clock. This is the second half of how the previous feed went quiet.
+      - name: Keep the schedule alive
+        uses: gautamkrishnar/keepalive-workflow@v2
+        with:
+          use_api: true

@@ -1,0 +1,32 @@
+name: Freshness audit
+
+# Independent watchdog. If the published feed falls behind, this fails and
+# GitHub emails the owner. Runs on its own schedule so a broken build job
+# cannot also silence the alarm.
+on:
+  schedule:
+    - cron: "0 14 * * 5"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert the committed feed is recent
+        run: |
+          python3 - <<'PY'
+          import json, sys, datetime as dt
+          d = json.load(open("data/stock_market_data.json"))
+          m = d["metadata"]
+          built = dt.datetime.fromisoformat(m["last_updated"])
+          age = (dt.datetime.now(dt.timezone.utc) - built).days
+          print(f"latest data month: {m['latest_date']}  feed built {age} days ago")
+          if age > 45:
+              sys.exit(f"STALE: feed has not been rebuilt in {age} days.")
+          latest = dt.date.fromisoformat(m["latest_date"])
+          months = (dt.date.today().year - latest.year) * 12 + dt.date.today().month - latest.month
+          if months > 4:
+              sys.exit(f"STALE: latest data month {m['latest_date']} is {months} months behind.")
+          print("OK")
+          PY
