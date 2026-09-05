@@ -13,9 +13,6 @@ on:
 
 permissions:
   contents: write
-  # The keepalive step calls the Actions API; without this it 403s and turns an
-  # otherwise-successful data build red.
-  actions: write
 
 concurrency:
   group: update-data
@@ -25,6 +22,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # This job deliberately uses ONLY GitHub-owned actions. A job's actions are
+      # all resolved during "Set up job", before any step runs, so a third-party
+      # action that the repo's Actions policy disallows fails the ENTIRE job in
+      # ~2s -- and continue-on-error cannot save it, because no step ever ran.
+      # That is exactly how the first two runs of this pipeline died. Keepalive
+      # therefore lives in keepalive.yml, where it can only break itself.
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
@@ -48,6 +51,7 @@ jobs:
           d = json.load(open("data/stock_market_data.json"))
           m = d["metadata"]
           print("records:", m["total_records"], "latest:", m["latest_date"])
+          print("last_updated:", m["last_updated"])
           print("latest CAPE:", d["data"][-1]["cape"])
           PY
 
@@ -59,18 +63,11 @@ jobs:
             git add data
             git commit -m "Update Shiller data ($(date -u +%Y-%m-%d))"
             git push
+            echo "Committed and pushed."
           else
-            echo "No change in data; nothing to commit."
+            # last_updated is datetime.now(), so a successful build ALWAYS
+            # changes the file. Reaching this branch means the build step did
+            # not actually write -- treat it as a failure, not a quiet no-op.
+            echo "::error::No diff in data/ after a successful build. last_updated should change on every run; something did not write."
+            exit 1
           fi
-
-      # GitHub disables scheduled workflows after 60 days of repository
-      # inactivity, and commits pushed by GITHUB_TOKEN do not reliably reset
-      # that clock. This is the second half of how the previous feed went quiet.
-      # Nice-to-have, not the point of the job. If the action fails or changes its
-      # interface, that must never mask a successful data build — a red run here
-      # would train us to ignore exactly the alarm this pipeline exists to raise.
-      - name: Keep the schedule alive
-        continue-on-error: true
-        uses: gautamkrishnar/keepalive-workflow@v2
-        with:
-          use_api: true

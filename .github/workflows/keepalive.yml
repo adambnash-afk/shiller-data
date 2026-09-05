@@ -1,0 +1,29 @@
+name: Keepalive
+
+# GitHub disables scheduled workflows after 60 days of repository inactivity,
+# and commits pushed by GITHUB_TOKEN do not reliably reset that clock. This is
+# the second half of how the previous Shiller feed went quiet.
+#
+# It is deliberately a SEPARATE workflow and uses no third-party actions: if it
+# breaks, the data pipeline and the freshness audit are untouched.
+on:
+  schedule:
+    - cron: "0 12 1 * *"   # monthly, 1st at 12:00 UTC
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Re-enable scheduled workflows
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for wf in update-data.yml freshness-audit.yml keepalive.yml; do
+            echo "Enabling $wf"
+            gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/$wf/enable" \
+              && echo "  ok" || echo "  could not enable $wf (may already be enabled)"
+          done
