@@ -11,8 +11,26 @@ This pipeline is built to fail loudly instead of quietly:
 - It **scrapes `shillerdata.com` for the current `ie_data.xls` link** rather than hardcoding it. The real URL is a GoDaddy blob with a rotating UUID and `?ver=` timestamp, so hardcoding guarantees eventual breakage.
 - It maps spreadsheet columns **by header text, not position**. Shiller's sheet contains two blank spacer columns; a positional parser silently mis-maps TR CAPE and Excess CAPE Yield.
 - It **refuses to publish** on any anomaly: missing download link, an unmappable column, too few records, CAPE outside a sane range, or output that would regress against what is already published. A failed run emails the repo owner.
+- **An empty diff is treated as a failure, not a no-op.** `last_updated` is `datetime.now()`, so a successful build *always* produces a change. If the commit step finds nothing to commit, something did not write, and the run exits non-zero rather than reporting success.
 - A separate **freshness audit** workflow fails if the feed falls behind, so a broken build job cannot also silence the alarm.
-- A **keepalive** step prevents GitHub from auto-disabling the cron after 60 days of inactivity.
+- A separate **keepalive** workflow stops GitHub auto-disabling the crons after 60 days of repository inactivity. It is deliberately its own workflow and uses no third-party actions — see below.
+
+## Workflows
+
+| File | Schedule | Purpose |
+|---|---|---|
+| `update-data.yml` | Tue 13:00 UTC, on push to `scripts/**`, manual | Build and publish the feed |
+| `freshness-audit.yml` | Fri 14:00 UTC, manual | Independent watchdog: fails at >45 days since build, or latest month >4 months behind |
+| `keepalive.yml` | Monthly, manual | Re-enables the scheduled workflows via `gh api` |
+
+> **Why keepalive is a separate workflow.** It originally ran as a final step of
+> `update-data.yml` using a third-party action, marked `continue-on-error: true`. That did
+> not isolate it. A job resolves *every* action it references during "Set up job", before
+> any step runs — so when the repository's Actions policy disallowed the third-party
+> action, the entire data build failed in 2 seconds with `Repository access blocked`, and
+> `continue-on-error` never came into play because no step had started. The data job now
+> uses only GitHub-owned actions (`actions/checkout`, `actions/setup-python`), and
+> keepalive lives where it can only break itself.
 
 ## Endpoints
 
@@ -48,9 +66,12 @@ Missing values are `null` (Shiller uses `NA` and blanks).
 
 ```bash
 pip install "xlrd==2.0.*"
-python3 scripts/build_data.py --out data                    # download
-python3 scripts/build_data.py --out data --local ie_data.xls  # use a local copy
+python3 scripts/build_data.py --out data                     # download from shillerdata.com
+python3 scripts/build_data.py --out data --local ie_data.xls # use a local copy
 ```
+
+Run from the repository root. CI commits to `data/` directly, so **`git pull` before doing
+local work** or you will rebuild on top of a stale checkout.
 
 ## Attribution
 
