@@ -2,29 +2,29 @@
   "metadata": {
     "source": "Robert Shiller - Yale Economics",
     "source_url": "https://shillerdata.com/",
-    "last_updated": "2026-09-29T18:31:18+00:00",
+    "last_updated": "2026-10-06T18:51:00+00:00",
     "description": "U.S. Stock Market Data including S&P 500, earnings, dividends, and CAPE ratio",
-    "total_records": 1869,
-    "latest_date": "2026-09-01"
+    "total_records": 1870,
+    "latest_date": "2026-10-01"
   },
   "data": [
     {
-      "date": 2026.09,
+      "date": 2026.1,
       "year": 2026,
-      "month": 9,
-      "date_string": "2026-09-01",
-      "sp500": 7631.47,
+      "month": 10,
+      "date_string": "2026-10-01",
+      "sp500": 7722.72,
       "dividend": null,
       "earnings": null,
-      "cpi": 333.8925,
-      "date_fraction": 2026.7083333331918,
-      "long_interest_rate": 4.75,
-      "real_price": 7631.47,
+      "cpi": 335.77650000000006,
+      "date_fraction": 2026.791666666525,
+      "long_interest_rate": 5.24,
+      "real_price": 7722.72,
       "real_dividend": null,
       "real_earnings": null,
-      "cape": 40.575838200376445,
-      "tr_cape": 43.206635485233484,
-      "excess_cape_yield": 0.010101399206805896,
+      "cape": 40.710608577487044,
+      "tr_cape": 43.32811219938697,
+      "excess_cape_yield": 0.005572419089988807,
       "forward_10y_real_return": null
     }
   ]
